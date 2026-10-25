@@ -48,6 +48,8 @@ XML_PATHS = {
     "authwebsite": os.path.join(ADDON_PATH, "authwebsite.xml"),
 }
 
+AUTHADDIN_JSON = os.path.join(ADDON_PATH, "authaddin.json")
+
 
 def is_systemd_user_available() -> bool:
     if shutil.which("systemctl") is None:
@@ -229,6 +231,21 @@ def uninstall():
             if os.path.isdir(full_path) and "wps-zotero" in entry:
                 print(f"Removing directory {full_path}")
                 shutil.rmtree(full_path, ignore_errors=True)
+    if os.path.isfile(AUTHADDIN_JSON):
+        try:
+            import json
+            with open(AUTHADDIN_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            wps_sec = data.get("wps")
+            if isinstance(wps_sec, dict):
+                namelist = wps_sec.get("namelist")
+                if isinstance(namelist, list) and "wps-zotero" in namelist:
+                    namelist.remove("wps-zotero")
+                    with open(AUTHADDIN_JSON, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4)
+                    print("Removed wps-zotero from authaddin.json namelist")
+        except Exception as e:
+            print(f"Warning: Could not update {AUTHADDIN_JSON}: {e}")
 
     for fp in XML_PATHS.values():
         if not os.path.isfile(fp):
@@ -329,6 +346,21 @@ def install():
 
     rec_auth = '<website origin="null" name="wps-zotero" status="enable"/>'
     register_xml(XML_PATHS["authwebsite"], "websites", rec_auth)
+    if os.path.isfile(AUTHADDIN_JSON):
+        try:
+            import json
+            with open(AUTHADDIN_JSON, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            wps_sec = data.get("wps")
+            if isinstance(wps_sec, dict):
+                namelist = wps_sec.get("namelist")
+                if isinstance(namelist, list) and "wps-zotero" not in namelist:
+                    namelist.append("wps-zotero")
+                    with open(AUTHADDIN_JSON, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4)
+                    print("Added wps-zotero to authaddin.json namelist")
+        except Exception as e:
+            print(f"Warning: Could not update {AUTHADDIN_JSON}: {e}")
 
     configure_zotero_windows_prefs()
 
