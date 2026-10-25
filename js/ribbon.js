@@ -20,6 +20,63 @@ function zc_alert(msg) {
 // Storing global variables
 const GLOBAL_MAP = {};
 
+function zc_quickAddCitation() {
+    zc_bind().command('addEditCitation');
+    zc_clearRegistry();
+}
+
+function zc_quickAddBib() {
+    zc_bind().command('addEditBibliography');
+    zc_clearRegistry();
+}
+
+function zc_quickRefresh() {
+    zc_bind().import();
+    zc_bind().command('refresh');
+    zc_clearRegistry();
+}
+
+// Expose on global window object for WPS JSA macro execution
+if (typeof window !== "undefined") {
+    window.zc_quickAddCitation = zc_quickAddCitation;
+    window.zc_quickAddBib = zc_quickAddBib;
+    window.zc_quickRefresh = zc_quickRefresh;
+}
+
+function zc_registerKeyBindings(doc) {
+    try {
+        if (typeof Application === 'undefined' || !Application.KeyBindings) {
+            return;
+        }
+
+        const targetDoc = doc || (typeof Application.ActiveDocument !== 'undefined' ? Application.ActiveDocument : null) || (typeof Application.NormalTemplate !== 'undefined' ? Application.NormalTemplate : null);
+        if (targetDoc) {
+            Application.CustomizationContext = targetDoc;
+        }
+
+        const wdKeyCategoryMacro = 2;
+        const wdKeyShift = 256;
+        const wdKeyControl = 512;
+        const wdKeyAlt = 1024;
+        const wdKeyZ = 90;
+        const wdKeyB = 66;
+        const wdKeyR = 82;
+        const wdKeyC = 67;
+
+        const keyCodeAltZ = Application.BuildKeyCode ? Application.BuildKeyCode(wdKeyAlt, wdKeyZ) : (wdKeyAlt + wdKeyZ);
+        const keyCodeCtrlAltC = Application.BuildKeyCode ? Application.BuildKeyCode(wdKeyControl, wdKeyAlt, wdKeyC) : (wdKeyControl + wdKeyAlt + wdKeyC);
+        const keyCodeAltB = Application.BuildKeyCode ? Application.BuildKeyCode(wdKeyAlt, wdKeyB) : (wdKeyAlt + wdKeyB);
+        const keyCodeAltR = Application.BuildKeyCode ? Application.BuildKeyCode(wdKeyAlt, wdKeyR) : (wdKeyAlt + wdKeyR);
+
+        Application.KeyBindings.Add(wdKeyCategoryMacro, "zc_quickAddCitation", keyCodeAltZ);
+        Application.KeyBindings.Add(wdKeyCategoryMacro, "zc_quickAddCitation", keyCodeCtrlAltC);
+        Application.KeyBindings.Add(wdKeyCategoryMacro, "zc_quickAddBib", keyCodeAltB);
+        Application.KeyBindings.Add(wdKeyCategoryMacro, "zc_quickRefresh", keyCodeAltR);
+    } catch (e) {
+        console.warn('WPS-Zotero: Failed to register KeyBindings:', e);
+    }
+}
+
 /**
  * Callback for plugin loading.
 **/
@@ -59,6 +116,17 @@ function OnAddinLoad(ribbonUI) {
         } else {
             wps.OAAssist.ShellExecute('python3', GLOBAL_MAP.proxyPath);
         }
+    }
+
+    // Register keyboard shortcuts and document event listeners
+    zc_registerKeyBindings();
+    if (typeof Application !== "undefined" && Application.ApiEvent) {
+        Application.ApiEvent.AddApiEventListener("DocumentOpen", (doc) => {
+            zc_registerKeyBindings(doc);
+        });
+        Application.ApiEvent.AddApiEventListener("NewDocument", (doc) => {
+            zc_registerKeyBindings(doc);
+        });
     }
     return true;
 }

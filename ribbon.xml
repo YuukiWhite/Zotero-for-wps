@@ -1,11 +1,11 @@
 <customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui" onLoad="OnAddinLoad">
     <ribbon startFromScratch="false">
         <tabs>
-            <tab id="zoteroTab" label="Zotero" keytip="C">
+            <tab id="zoteroTab" label="Zotero" keytip="Z">
                 <group id="zoteroGroup" label="Zotero">
-                    <button id="btnAddEditCitation" label="Add/Edit Citation" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Insert a new citation, or edit the citation at the current cursor position" keytip="C"/>
-                    <button id="btnAddEditBib" label="Add/Edit Refs" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Insert a new bibliography, or edit the existing bibliography, at the current cursor position" keytip="B"/>
-                    <button id="btnRefresh" label="Refresh" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Update all citations to reflect changes" keytip="R"/>
+                    <button id="btnAddEditCitation" label="Add/Edit Citation" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Insert a new citation, or edit the citation at the current cursor position (Shortcuts: Alt+Z or Ctrl+Alt+C)" keytip="C"/>
+                    <button id="btnAddEditBib" label="Add/Edit Refs" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Insert a new bibliography, or edit the existing bibliography, at the current cursor position (Shortcut: Alt+B)" keytip="B"/>
+                    <button id="btnRefresh" label="Refresh" onAction="OnAction" getImage="GetImage" visible="true" size="large" supertip="Update all citations and bibliography to reflect changes in Zotero (Shortcut: Alt+R)" keytip="R"/>
                     <button id="btnPref" label="Preferences" onAction="OnAction" getImage="GetImage" visible="true" supertip="Change the citation style or locale" keytip="P"/>
                     <button id="btnAddNote" label="Add Note" onAction="OnAction" getImage="GetImage" visible="true" supertip="Insert a new note at the current cursor position" keytip="N"/>
                     <button id="btnUnlink" label="Unlink" onAction="OnAction" getImage="GetImage" visible="true" supertip="Remove all Zotero field codes and unlink from Zotero library" keytip="U"/>

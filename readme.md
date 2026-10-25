@@ -1,37 +1,231 @@
 # WPS-Zotero
 
-A WPS Writer add-on for integrating with Zotero. **It supports both GNU/Linux and Windows now**. WPS is an office suite with excellent compatibility to MS Word. For scientific workers to migrate from Windows to GNU/Linux, lacking a good Word processor with citation management support has always been a great obstacle. With this add-on, you can add/edit citations in documents created with MS Word or send your documents created with WPS Writer to others to edit in MS Word. It should provide a seamless experience for people who work in an environment where everyone else use Windows and MS Word. If you encountered any problem, please open an issue, I will fix it ASAP.
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
+[![Platform: Linux | Windows](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-green.svg)](#installation)
+[![Zotero: 6 | 7](https://img.shields.io/badge/Zotero-6%20%7C%207-red.svg)](https://www.zotero.org/)
+[![WPS Office](https://img.shields.io/badge/WPS%20Office-Writer-orange.svg)](https://www.wps.com/)
 
-这个插件可以让你在Linux下写论文，再发给别人在Windows/MS Word下改，两边插入的引用可以共通（需要选择将引用存储为域）。**现在也支持Windows了哦**（Windows下有一些问题，翻到最后查看）。喜欢的朋友点个星星，帮忙散播一下消息，帮助更多科研狗逃脱Windows/MS Office！
+A fast, native WPS Writer integration add-on for [Zotero](https://www.zotero.org/) with full keyboard shortcut support, Microsoft Word cross-compatibility, and automatic background proxy management on both **GNU/Linux** and **Windows**.
+
+---
+
+## Highlights
+
+- ⚡ **Instant Keyboard Shortcuts**: Insert citations (`Alt+Z` or `Ctrl+Alt+C`), insert bibliography (`Alt+B`), and refresh references (`Alt+R`) without touching the mouse.
+- 🔄 **Two-Way Microsoft Word Compatibility**: Citations are stored as standard Word-compatible field codes. Send `.docx` files between Linux (WPS Writer) and Windows/macOS (Microsoft Word) seamlessly.
+- 🐧 **Native Linux & Windows Support**: Works on modern Linux distributions (Fedora, Ubuntu, Debian, Arch, openSUSE) and Windows 10/11.
+- 🛡️ **Zero-Configuration Daemon**: Background HTTP proxy runs quietly as a systemd user service on Linux or autostart background process on Windows.
+- ⌨️ **Ribbon Accelerator Keytips**: Intuitive `Alt` &rarr; `Z` &rarr; `<Key>` navigation matching Microsoft Office conventions.
+
+---
+
+## Keyboard Shortcuts & Ribbon Accelerators
+
+### Global Document Shortcuts
+
+| Shortcut | Action | Description |
+| :--- | :--- | :--- |
+| **`Alt + Z`** | **Add / Edit Citation** | Open Zotero citation dialog at current cursor position |
+| **`Ctrl + Alt + C`** | **Add / Edit Citation** | Alternative shortcut (ideal if `Alt+Z` is bound to GPU overlays like GeForce Experience) |
+| **`Alt + B`** | **Add / Edit Bibliography** | Insert bibliography at cursor, or update existing references list |
+| **`Alt + R`** | **Refresh Citations** | Synchronize all citations and bibliography with your Zotero library |
+
+*Note: Shortcuts are automatically registered when WPS starts and whenever any document is opened or created.*
+
+### Ribbon Keytip Navigation
+
+Press <kbd>Alt</kbd> (or <kbd>F10</kbd>), then press <kbd>Z</kbd> to activate the Zotero ribbon tab, followed by a button key:
+
+| Key Sequence | Command | Description |
+| :--- | :--- | :--- |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>C</kbd> | **Add/Edit Citation** | Insert or edit citation |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>B</kbd> | **Add/Edit Refs** | Insert or edit bibliography |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>R</kbd> | **Refresh** | Update all citations |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>P</kbd> | **Preferences** | Change citation style or language |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>N</kbd> | **Add Note** | Insert note from Zotero |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>U</kbd> | **Unlink** | Detach citations into plain text |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>E</kbd> | **Export** | Convert format for switching word processors |
+| <kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>A</kbd> | **About** | Show version and license information |
+
+---
+
+## Prerequisites
+
+1. **WPS Office** (WPS Writer with JS Add-in support).
+2. **Zotero** (v6 or v7), installed and running in the background.
+3. **Python 3** (3.8 or newer):
+   - **Linux**: Pre-installed on almost all distributions (`python3 --version`).
+   - **Windows**: Download from [python.org](https://www.python.org/downloads/). **Make sure to check "Add Python to PATH"** during installation.
+
+---
 
 ## Installation
 
-Install the latest version of WPS and Zotero and make sure you have Python3 installed (**Be sure to check the checkbox for adding Python to the %PATH% environment variable when installing Python**).
+### Linux
 
-Download **the repository** (release packages are older and therefore not recommended), unzip and go into it, and run `./install.py` (`python install.py` on Windows).
+Open your terminal and run:
 
-To uninstall, run `./install.py -u` (`python install.py -u` on Windows).
+```bash
+# 1. Clone repository
+git clone https://github.com/YuukiWhite/Zotero-for-wps.git
+cd Zotero-for-wps
 
-(On Windows, you can open a terminal by hitting the start button and type `cmd`, then use the `cd` command to go to the unzipped directory, `cd D:\Downloads\WPS-Zotero`, e.g.)
+# 2. Run installer
+python3 install.py
+```
 
-先保证Python3安装好（**Windows上安装Python注意勾选添加到环境变量的选项**），Linux一般自带了，然后直接下载源码包解压，Linux用户执行install.py安装；Windows用户双击bat安装脚本进行安装或卸载，如果不行可以用另一种方法安装，看[**详细教程**](https://www.cnblogs.com/tkwblog/articles/17705935.html)。
+The installer will:
+- Copy add-on files to `~/.local/share/Kingsoft/wps/jsaddons/wps-zotero_0.2.0/`.
+- Register the add-on in WPS configuration files (`jsplugins.xml`, `publish.xml`, `authaddin.json`).
+- Set up and start a systemd user service (`wps-zotero-proxy.service`).
+- Verify health check on `http://127.0.0.1:21931/health`.
 
-## How does it work
+### Windows
 
-This add-on uses WPS's jsapi to control WPS Writer, and works with Zotero through its [HTTP citing protocol](https://www.zotero.org/support/dev/client_coding/http_integration_protocol). Due to [the host permission restrictions of Zotero](https://groups.google.com/g/zotero-dev/c/MjWzJxaVoSs), direct HTTP requests from the client will be blocked by CORS. As a workaround, a simple HTTP proxy written in Python is used.
+Open **Command Prompt** (`cmd`) or **PowerShell** as a normal user:
 
-## About MS Word compatibility
+```cmd
+git clone https://github.com/YuukiWhite/Zotero-for-wps.git
+cd Zotero-for-wps
+python install.py
+```
 
-The add-on will store data to documents in a way similar as MS Word does. The only difference is that the `formattedCitation` in the field data is in XML format, while MS Word uses RTF format. However, this shouldn't pose any inconvenience for common users. Because Zotero will automatically update it for you. However, you should always store citations in fields rather than bookmarks, as the latter is not supported by this add-on.
+*(Alternatively, you can double-click `windows安装与卸载.bat`)*
 
-## Common fixes
+The installer will:
+- Copy add-on files to `%APPDATA%\kingsoft\wps\jsaddons\wps-zotero_0.2.0`.
+- Register the add-on in WPS add-on manifests.
+- Configure autostart for the background proxy using `pythonw.exe`.
+- Configure Zotero connector preferences if necessary.
 
-If there's something wrong occurred during a transaction, the Zotero server will then be unusable, you will then be advised to restart Zotero. For other cases, restart WPS Writer and Zotero to see if the problem persists. If the problem persists, you can run `python proxy.py kill` in the package directory to quit the proxy server manually before restarting the applications. Re-installation can be tried of course if you still can't fix it.
+---
 
-## Known issues
+## Verification
 
-- On Windows, the Zotero citation windows might not be focused sometimes and they might be placed in background, you can click the Zotero icon on your task bar to bring it to front. This seems to be [a bug of Zotero](https://github.com/zotero/zotero-libreoffice-integration/issues/41).
+1. Start **Zotero**.
+2. Open **WPS Writer**.
+3. You will see a new **Zotero** tab on the ribbon.
+4. Press `Alt+Z` (or `Ctrl+Alt+C`). The red Zotero citation bar will pop up immediately.
+5. Select a reference, press Enter, and the citation will be inserted into your document!
 
-- On Windows, the WPS JSAPI (which this addon relies on) is quite unreliable. A known problem with the latest version of WPS is that the `wps.OAAssist.ShellExecute` function can no longer starts local programs which leads to #16. As a temporary solution one can start proxy.py manually with a double click.
+---
 
-- Shortcuts are currently not possible. But on Windows, one can activate the ribbon by `Alt-C`, then hit subsequent keys to simulate button clicking. For example, `Alt-C Alt-C` (holding `Alt` and press `C` twice) does just the same thing as clicking the 'Add/Edit Citation' button. However, this won't work on Linux for the Linux version of WPS doesn't support this feature.
+## Uninstallation
+
+To cleanly remove the add-on, stop the proxy service, and clean up registry/config entries:
+
+- **Linux**:
+  ```bash
+  python3 install.py -u
+  ```
+- **Windows**:
+  ```cmd
+  python install.py -u
+  ```
+
+---
+
+## How It Works
+
+```
+┌─────────────────┐        JSA HTTP        ┌────────────────────────┐        Local HTTP       ┌──────────────────┐
+│   WPS Writer    │ ─────────────────────> │  Python Proxy Daemon   │ ─────────────────────>  │  Zotero Desktop  │
+│ (JS Add-in Tab) │  http://127.0.0.1:21931│  (systemd / autostart) │  http://127.0.0.1:23119 │ (Citing Server)  │
+└─────────────────┘                        └────────────────────────┘                         └──────────────────┘
+```
+
+1. **WPS JSA Frontend**: Uses WPS Office's JavaScript API (JSA) and Microsoft Word-compatible `Application.KeyBindings` to handle ribbon buttons, accelerator keys, and shortcut events.
+2. **Local HTTP Proxy (`proxy.py`)**: Zotero's local HTTP citation API (listening on port 23119) enforces strict CORS and host header restrictions. WPS's embedded browser cannot talk directly to Zotero without triggering security blocks. The lightweight Python proxy runs locally on port 21931, forwarding commands with proper headers (`X-Zotero-Connector-API-Version`, stripping `Origin`/`Sec-Fetch-*`).
+3. **Persistence**:
+   - Linux: Managed via systemd user unit `wps-zotero-proxy.service` (auto-restarts on failure, runs only in user session).
+   - Windows: Managed via `pythonw.exe` and user startup registry.
+
+---
+
+## Microsoft Word Compatibility Guide
+
+- **Field Codes**: Citations created by this add-on use standard Word-compatible field codes.
+- **Cross-Platform Editing**: You can write a paper in WPS Writer on Linux, save it as `.docx`, and email it to colleagues using Microsoft Word on Windows or macOS. They can edit or add citations using the official Zotero Word integration seamlessly.
+- **Rule of Thumb**: When prompted by Zotero for Document Preferences, always choose **"Store citations as Fields"** (the default in MS Word) rather than Bookmarks.
+
+---
+
+## Troubleshooting & FAQ
+
+### 1. "Zotero is not running" or Error 502
+- Ensure the Zotero desktop application is open before clicking citation buttons or using shortcuts.
+- Check proxy status on Linux:
+  ```bash
+  systemctl --user status wps-zotero-proxy
+  ```
+- Test proxy health:
+  ```bash
+  curl http://127.0.0.1:21931/health
+  # Should return: {"status": "ok", "version": "0.2.0"}
+  ```
+
+### 2. `Alt+Z` does not trigger Zotero
+- Some graphics drivers (e.g. NVIDIA GeForce Experience in-game overlay or AMD Radeon software) intercept `Alt+Z` globally.
+- Use **`Ctrl+Alt+C`** as the built-in alternative shortcut.
+- Alternatively, use the ribbon accelerator: press <kbd>Alt</kbd>, then <kbd>Z</kbd>, then <kbd>C</kbd>.
+
+### 3. Zotero citation dialog appears behind WPS Writer
+- This is an upstream window manager / focus behavior in certain desktop environments. Click the Zotero icon in your taskbar / dock to bring the red search bar to front.
+
+---
+
+## Running Automated Tests
+
+The repository includes a comprehensive unit test suite covering proxy operations, CORS headers, error handling, ribbon XML schemas, and shortcut keybindings:
+
+```bash
+python3 -m unittest discover -s tests -p "test_*.py" -v
+```
+
+All 13 tests verify proxy forwarding, connection recovery, keycode arithmetic, and XML/JSA syntax.
+
+---
+
+<details>
+<summary><b>🇨🇳 中文说明 / Chinese Documentation (点击展开)</b></summary>
+
+### 简介
+WPS-Zotero 是为 WPS 文字（WPS Writer）开发的 Zotero 文献引用集成插件，支持 **GNU/Linux** 与 **Windows** 双平台。彻底解决学术科研人员在 Linux 下缺乏好用的论文排版与文献管理工具的问题，并支持与 Microsoft Word 用户无缝协同。
+
+### 快捷键与快速访问
+- **`Alt + Z`** 或 **`Ctrl + Alt + C`**：快速插入/编辑文献引用（调用 Zotero 红色搜索栏）。
+- **`Alt + B`**：插入或更新参考文献列表（Bibliography）。
+- **`Alt + R`**：刷新所有引用与文献库同步。
+- **Ribbon 快捷键**：按下 <kbd>Alt</kbd> 后按 <kbd>Z</kbd> 进入 Zotero 选项卡，按 <kbd>C</kbd> 插入引用、<kbd>B</kbd> 插入文献列表、<kbd>R</kbd> 刷新、<kbd>P</kbd> 首选项。
+
+### 一键安装
+确保已安装 WPS Office、Zotero（保持后台运行）以及 Python 3。
+
+- **Linux 安装**：
+  ```bash
+  git clone https://github.com/YuukiWhite/Zotero-for-wps.git
+  cd Zotero-for-wps
+  python3 install.py
+  ```
+- **Windows 安装**：
+  ```cmd
+  git clone https://github.com/YuukiWhite/Zotero-for-wps.git
+  cd Zotero-for-wps
+  python install.py
+  ```
+  *(或直接双击 `windows安装与卸载.bat`)*
+
+- **卸载**：
+  执行 `python3 install.py -u`（Windows 下执行 `python install.py -u`）。
+
+### 与 Microsoft Word 兼容性
+引文以 Word 兼容的域（Field）形式保存为 `.docx`。在 Linux 下用 WPS 撰写的论文，发给使用 Windows / macOS + MS Word 的导师或同行，双方均可直接继续添加或编辑引用。
+
+</details>
+
+---
+
+## License
+
+This project is licensed under the [GNU General Public License v3.0](LICENSE.txt).
+Based on upstream work by [Tang, Kewei](https://github.com/tankwyn/WPS-Zotero).

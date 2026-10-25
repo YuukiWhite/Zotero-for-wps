@@ -329,6 +329,7 @@ def install():
     shutil.copytree(
         PKG_PATH,
         INSTALLED_PLUGIN_DIR,
+        dirs_exist_ok=True,
         ignore=shutil.ignore_patterns(".git*", "__pycache__", "tests", "*.pyc", "*.log"),
     )
 
