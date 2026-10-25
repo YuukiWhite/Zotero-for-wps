@@ -1,168 +1,356 @@
 #!/usr/bin/env python3
+"""
+WPS-Zotero Cross-Platform Installer & Service Manager
+
+Installs or uninstalls WPS-Zotero add-on for WPS Office Writer on Linux and Windows.
+Configures autostart service (systemd user service on Linux, Run key on Windows),
+registers WPS JSAPI plugins, and verifies proxy health.
+"""
 
 import os
-import platform
-import shutil
 import sys
+import shutil
 import re
-import stat
-import subprocess 
-from proxy import stop_proxy
+import time
+import subprocess
+from proxy import stop_proxy, is_proxy_healthy, VERSION
 
-
-# Prevent running as root on Linux
-if platform.system() == 'Linux' and os.environ['USER'] == 'root':
-    print("This addon cannot be installed as root!", file=sys.stderr)
+# Prevent running as root on POSIX
+if os.name == "posix" and hasattr(os, "geteuid") and os.geteuid() == 0:
+    print("Error: This add-on cannot be installed as root!", file=sys.stderr)
+    print("Please run this installer as a normal user.", file=sys.stderr)
     sys.exit(1)
 
-
-# Check whether Python 3 is in PATH
-def checkpy():
-    def runcmd(cmd):
-        p = subprocess.Popen(cmd, stdout=subprocess.PIPE)
-        code = p.wait()
-        res = [line.decode() for line in p.stdout.readlines()]
-        return code, res
-
-    if platform.system() == 'Windows':
-        cmd = 'where python'
-    else:
-        cmd = 'which python'
-    _, pyexes = runcmd(cmd)
-    ver = None
-    if len(pyexes) > 0:
-        _, res = runcmd('{} --version'.format(pyexes[0].strip()))
-        if len(res) > 0 and res[0].startswith('Python 3'):
-            ver = res[0]
-    if ver is None:
-        print('Please add Python 3 to the PATH environment variable!')
-    else:
-        print('Python in PATH:', ver)
-    return ver
-        
-if platform.system() == 'Windows':
-    checkpy()
-
-
-# File & directory paths
 PKG_PATH = os.path.dirname(os.path.abspath(__file__))
-with open(PKG_PATH + os.path.sep + 'version.js') as f:
-    VERSION = f.readlines()[0].split('=')[-1].strip()[1:-1]
-APPNAME = 'wps-zotero_{}'.format(VERSION)
-if os.name == 'posix':
-    ADDON_PATH = os.environ['HOME'] + '/.local/share/Kingsoft/wps/jsaddons'
+APPNAME = f"wps-zotero_{VERSION}"
+
+# Determine addon directory
+if os.name == "posix":
+    home = os.path.expanduser("~")
+    ADDON_PATH = os.path.join(home, ".local", "share", "Kingsoft", "wps", "jsaddons")
+    SYSTEMD_USER_DIR = os.path.join(home, ".config", "systemd", "user")
+    SYSTEMD_SERVICE_FILE = os.path.join(SYSTEMD_USER_DIR, "wps-zotero-proxy.service")
+    AUTOSTART_DIR = os.path.join(home, ".config", "autostart")
+    AUTOSTART_DESKTOP_FILE = os.path.join(AUTOSTART_DIR, "wps-zotero-proxy.desktop")
 else:
-    ADDON_PATH = os.environ['APPDATA'] + '\\kingsoft\\wps\\jsaddons'
+    appdata = os.environ.get("APPDATA", os.path.expanduser("~"))
+    ADDON_PATH = os.path.join(appdata, "kingsoft", "wps", "jsaddons")
+    SYSTEMD_USER_DIR = ""
+    SYSTEMD_SERVICE_FILE = ""
+    AUTOSTART_DIR = ""
+    AUTOSTART_DESKTOP_FILE = ""
+
+INSTALLED_PLUGIN_DIR = os.path.join(ADDON_PATH, APPNAME)
+
 XML_PATHS = {
-    'jsplugins': ADDON_PATH + os.path.sep + 'jsplugins.xml',
-    'publish': ADDON_PATH + os.path.sep + 'publish.xml',
-    'authwebsite': ADDON_PATH + os.path.sep + 'authwebsite.xml'
+    "jsplugins": os.path.join(ADDON_PATH, "jsplugins.xml"),
+    "publish": os.path.join(ADDON_PATH, "publish.xml"),
+    "authwebsite": os.path.join(ADDON_PATH, "authwebsite.xml"),
 }
-PROXY_PATH = ADDON_PATH + os.path.sep + 'proxy.py'
+
+
+def is_systemd_user_available() -> bool:
+    if shutil.which("systemctl") is None:
+        return False
+    try:
+        res = subprocess.run(
+            ["systemctl", "--user", "is-system-running"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=5,
+        )
+        status = res.stdout.strip()
+        return res.returncode == 0 or status in (
+            "running",
+            "degraded",
+            "initializing",
+            "starting",
+        )
+    except Exception:
+        return False
+
+
+def install_service_linux(proxy_script: str):
+    py_exe = sys.executable or "/usr/bin/python3"
+    if is_systemd_user_available():
+        os.makedirs(SYSTEMD_USER_DIR, exist_ok=True)
+        unit_content = f"""[Unit]
+Description=WPS-Zotero HTTP Proxy
+After=network.target
+
+[Service]
+Type=simple
+ExecStart={py_exe} {proxy_script}
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target
+"""
+        with open(SYSTEMD_SERVICE_FILE, "w", encoding="utf-8") as f:
+            f.write(unit_content)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
+        subprocess.run(["systemctl", "--user", "enable", "wps-zotero-proxy"], check=False)
+        subprocess.run(["systemctl", "--user", "restart", "wps-zotero-proxy"], check=False)
+        print("Registered systemd user service wps-zotero-proxy")
+    else:
+        # Fallback to desktop autostart entry
+        os.makedirs(AUTOSTART_DIR, exist_ok=True)
+        desktop_content = f"""[Desktop Entry]
+Type=Application
+Name=WPS-Zotero HTTP Proxy
+Exec={py_exe} {proxy_script}
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true
+"""
+        with open(AUTOSTART_DESKTOP_FILE, "w", encoding="utf-8") as f:
+            f.write(desktop_content)
+        # Detached launch
+        subprocess.Popen([py_exe, proxy_script], start_new_session=True)
+        print("Registered autostart desktop entry and launched proxy daemon")
+
+
+def uninstall_service_linux():
+    if shutil.which("systemctl"):
+        subprocess.run(
+            ["systemctl", "--user", "disable", "--now", "wps-zotero-proxy"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        if os.path.exists(SYSTEMD_SERVICE_FILE):
+            try:
+                os.remove(SYSTEMD_SERVICE_FILE)
+            except OSError:
+                pass
+        subprocess.run(
+            ["systemctl", "--user", "daemon-reload"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    if os.path.exists(AUTOSTART_DESKTOP_FILE):
+        try:
+            os.remove(AUTOSTART_DESKTOP_FILE)
+        except OSError:
+            pass
+
+
+def find_pythonw() -> str:
+    py_dir = os.path.dirname(sys.executable)
+    cand = os.path.join(py_dir, "pythonw.exe")
+    if os.path.isfile(cand):
+        return cand
+    which_pyw = shutil.which("pythonw")
+    if which_pyw:
+        return which_pyw
+    return sys.executable
+
+
+def install_service_windows(proxy_script: str):
+    pythonw = find_pythonw()
+    cmd = f'"{pythonw}" "{proxy_script}"'
+    try:
+        import winreg
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE,
+        )
+        winreg.SetValueEx(key, "WPS-Zotero-Proxy", 0, winreg.REG_SZ, cmd)
+        winreg.CloseKey(key)
+        print("Registered Windows Run key for WPS-Zotero-Proxy")
+    except Exception as e:
+        print(f"Warning: Failed to set Windows Run key: {e}")
+
+    # Immediately launch detached process
+    DETACHED_PROCESS = 0x00000008
+    CREATE_NO_WINDOW = 0x08000000
+    try:
+        subprocess.Popen(
+            [pythonw, proxy_script],
+            creationflags=DETACHED_PROCESS | CREATE_NO_WINDOW,
+            close_fds=True,
+        )
+        print("Launched proxy daemon via pythonw")
+    except Exception as e:
+        print(f"Warning: Failed to launch pythonw: {e}")
+
+
+def uninstall_service_windows():
+    try:
+        import winreg
+
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE,
+        )
+        try:
+            winreg.DeleteValue(key, "WPS-Zotero-Proxy")
+            print("Removed Windows Run key for WPS-Zotero-Proxy")
+        except FileNotFoundError:
+            pass
+        winreg.CloseKey(key)
+    except Exception:
+        pass
 
 
 def uninstall():
-    print("Trying to quit proxy server if it's currently listening...")
+    print("Stopping running proxy daemon if listening...")
     stop_proxy()
-    
-    def del_rw(action, name, exc):
-        os.chmod(name, stat.S_IWRITE)
-        os.remove(name)
 
-    if not os.path.isdir(ADDON_PATH):
-        return
+    if os.name == "posix":
+        uninstall_service_linux()
+    else:
+        uninstall_service_windows()
 
-    for x in os.listdir(ADDON_PATH):
-        if os.path.isdir(ADDON_PATH + os.path.sep + x) and 'wps-zotero' in x:
-            print('Removing {}'.format(ADDON_PATH + os.path.sep + x))
-            shutil.rmtree(ADDON_PATH + os.path.sep + x, onerror=del_rw)
+    if os.path.isdir(ADDON_PATH):
+        for entry in os.listdir(ADDON_PATH):
+            full_path = os.path.join(ADDON_PATH, entry)
+            if os.path.isdir(full_path) and "wps-zotero" in entry:
+                print(f"Removing directory {full_path}")
+                shutil.rmtree(full_path, ignore_errors=True)
 
     for fp in XML_PATHS.values():
         if not os.path.isfile(fp):
             continue
-        with open(fp) as f:
-            xmlStr = f.read()
-        records = [(m.start(),m.end()) for m in re.finditer(r'[\ \t]*<.*wps-zotero.*/>\s*', xmlStr)]
-        for r in records:
-            print('Removing record from {}'.format(fp))
-            with open(fp, 'w') as f:
-                f.write(xmlStr[:r[0]] + xmlStr[r[1]:])
-
-
-# Uninstall existing installation
-print('Uninstalling previous installations if there is any ...')
-uninstall()
-if len(sys.argv) > 1 and sys.argv[1] == '-u':
-    sys.exit()
-
-
-# Begin installation
-print('Installing')
-
-
-# Create necessary directory and files
-if not os.path.exists(ADDON_PATH):
-    os.makedirs(ADDON_PATH, exist_ok=True)
-if not os.path.exists(XML_PATHS['jsplugins']):
-    with open(XML_PATHS['jsplugins'], 'w') as f:
-        f.write('''<jsplugins>
-</jsplugins>
-''')
-if not os.path.exists(XML_PATHS['publish']):
-    with open(XML_PATHS['publish'], 'w') as f:
-        f.write('''<?xml version="1.0" encoding="UTF-8"?>
-<jsplugins>
-</jsplugins>
-''')
-if not os.path.exists(XML_PATHS['authwebsite']):
-    with open(XML_PATHS['authwebsite'], 'w') as f:
-        f.write('''<?xml version="1.0" encoding="UTF-8"?>
-<websites>
-</websites>
-''')
-
-
-# Copy to jsaddons
-shutil.copytree(PKG_PATH, ADDON_PATH + os.path.sep + APPNAME)
-
-
-# Write records to XML files
-def register(fp, tagname, record):
-    with open(fp) as f:
-        content = f.read()
-    pos = [m.end() for m in re.finditer(r'<' + tagname + r'>\s*', content)]
-    if len(pos) == 0:
-        content += f'<{tagname}></{tagname}>'
-        pos = [content.index(f'</{tagname}>')]
-    i = pos[0]
-    with open(fp, 'w') as f:
-        f.write(content[:i] + record + os.linesep + content[i:])
-
-rec = '<jsplugin name="wps-zotero" type="wps" url="http://127.0.0.1:3889/" version="{}"/>'.format(VERSION)
-register(XML_PATHS['jsplugins'], 'jsplugins', rec)
-rec = '<jsplugin url="http://127.0.0.1:3889/" type="wps" enable="enable_dev" install="null" version="{}" name="wps-zotero"/>'.format(VERSION)
-register(XML_PATHS['publish'], 'jsplugins', rec)
-rec = '<website origin="null" name="wps-zotero" status="enable"/>'
-register(XML_PATHS['authwebsite'], 'websites', rec)
-
-
-# Alleviate the "Zotero window not brought to front" problem.
-# https://www.zotero.org/support/kb/addcitationdialog_raised
-if os.name == 'nt':
-    print('Change zotero preference to alleviate the problem of Zotero window not showing in front.')
-    tmp = os.environ['APPDATA'] + '\\Zotero\\Zotero\\Profiles\\'
-    for fn in os.listdir(tmp):
-        if os.path.isdir(fn) and tmp.endswith('.default') and os.path.isfile(fn + '\\prefs.js'):
-            pref_fn = fn + '\\prefs.js'
-            with open(pref_fn) as f:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
                 content = f.read()
-            if 'extensions.zotero.integration.keepAddCitationDialogRaised' in content:
-                content = content.replace('user_pref("extensions.zotero.integration.keepAddCitationDialogRaised", false)', 'user_pref("extensions.zotero.integration.keepAddCitationDialogRaised", true);')
-            else:
-                content += '\nuser_pref("extensions.zotero.integration.keepAddCitationDialogRaised", true);\n'
-            with open(pref_fn, 'w') as f:
-                f.write(content)
+            cleaned = re.sub(r"[\ \t]*<[^>]*wps-zotero[^>]*/>\s*\n?", "", content)
+            if cleaned != content:
+                print(f"Cleaned wps-zotero entries from {fp}")
+                with open(fp, "w", encoding="utf-8") as f:
+                    f.write(cleaned)
+        except Exception as e:
+            print(f"Warning: Error updating {fp}: {e}")
 
 
-print('All done, enjoy!')
-print('(run ./install.py -u to uninstall)')
+def ensure_xml_templates():
+    os.makedirs(ADDON_PATH, exist_ok=True)
+    if not os.path.exists(XML_PATHS["jsplugins"]):
+        with open(XML_PATHS["jsplugins"], "w", encoding="utf-8") as f:
+            f.write("<jsplugins>\n</jsplugins>\n")
+    if not os.path.exists(XML_PATHS["publish"]):
+        with open(XML_PATHS["publish"], "w", encoding="utf-8") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n<jsplugins>\n</jsplugins>\n')
+    if not os.path.exists(XML_PATHS["authwebsite"]):
+        with open(XML_PATHS["authwebsite"], "w", encoding="utf-8") as f:
+            f.write('<?xml version="1.0" encoding="UTF-8"?>\n<websites>\n</websites>\n')
+
+
+def register_xml(fp: str, tagname: str, record: str):
+    with open(fp, "r", encoding="utf-8") as f:
+        content = f.read()
+    close_tag = f"</{tagname}>"
+    if close_tag in content:
+        idx = content.rfind(close_tag)
+        new_content = content[:idx] + f"  {record}\n" + content[idx:]
+    else:
+        new_content = content + f"\n<{tagname}>\n  {record}\n</{tagname}>\n"
+    with open(fp, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
+
+def configure_zotero_windows_prefs():
+    if sys.platform != "win32":
+        return
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return
+    profiles_dir = os.path.join(appdata, "Zotero", "Zotero", "Profiles")
+    if not os.path.isdir(profiles_dir):
+        return
+    for entry in os.listdir(profiles_dir):
+        profile_path = os.path.join(profiles_dir, entry)
+        if os.path.isdir(profile_path):
+            pref_fn = os.path.join(profile_path, "prefs.js")
+            if os.path.isfile(pref_fn):
+                try:
+                    with open(pref_fn, "r", encoding="utf-8") as f:
+                        pref_data = f.read()
+                    pref_key = "extensions.zotero.integration.keepAddCitationDialogRaised"
+                    if pref_key in pref_data:
+                        pref_data = pref_data.replace(
+                            f'user_pref("{pref_key}", false);',
+                            f'user_pref("{pref_key}", true);',
+                        )
+                    else:
+                        pref_data += f'\nuser_pref("{pref_key}", true);\n'
+                    with open(pref_fn, "w", encoding="utf-8") as f:
+                        f.write(pref_data)
+                    print(f"Configured keepAddCitationDialogRaised in {pref_fn}")
+                except Exception as e:
+                    print(f"Warning: Could not update {pref_fn}: {e}")
+
+
+def install():
+    print(f"Installing wps-zotero {VERSION}...")
+    ensure_xml_templates()
+
+    # Copy files
+    print(f"Copying files to {INSTALLED_PLUGIN_DIR}...")
+    shutil.copytree(
+        PKG_PATH,
+        INSTALLED_PLUGIN_DIR,
+        ignore=shutil.ignore_patterns(".git*", "__pycache__", "tests", "*.pyc", "*.log"),
+    )
+
+    # Register in XML files
+    rec_jsplugins = (
+        f'<jsplugin name="wps-zotero" type="wps" url="http://127.0.0.1:3889/" version="{VERSION}"/>'
+    )
+    register_xml(XML_PATHS["jsplugins"], "jsplugins", rec_jsplugins)
+
+    rec_publish = (
+        f'<jsplugin url="http://127.0.0.1:3889/" type="wps" enable="enable_dev" install="null" '
+        f'version="{VERSION}" name="wps-zotero"/>'
+    )
+    register_xml(XML_PATHS["publish"], "jsplugins", rec_publish)
+
+    rec_auth = '<website origin="null" name="wps-zotero" status="enable"/>'
+    register_xml(XML_PATHS["authwebsite"], "websites", rec_auth)
+
+    configure_zotero_windows_prefs()
+
+    installed_proxy = os.path.join(INSTALLED_PLUGIN_DIR, "proxy.py")
+    if sys.platform == "win32":
+        install_service_windows(installed_proxy)
+    else:
+        install_service_linux(installed_proxy)
+
+    print("Verifying proxy health...")
+    healthy = False
+    for _ in range(10):
+        if is_proxy_healthy():
+            healthy = True
+            break
+        time.sleep(0.5)
+
+    if healthy:
+        print("Health check OK")
+    else:
+        print("Warning: Proxy did not respond to /health check within 5 seconds.")
+
+    print(f"Installation of wps-zotero {VERSION} completed successfully.")
+
+
+def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "-u":
+        print("Uninstalling wps-zotero...")
+        uninstall()
+        print("Uninstallation complete.")
+        return
+
+    # Always perform a clean uninstall first
+    print("Performing clean uninstall of previous installations...")
+    uninstall()
+    install()
+
+
+if __name__ == "__main__":
+    main()
