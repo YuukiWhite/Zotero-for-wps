@@ -90,9 +90,10 @@ WantedBy=default.target
 """
         with open(SYSTEMD_SERVICE_FILE, "w", encoding="utf-8") as f:
             f.write(unit_content)
-        subprocess.run(["systemctl", "--user", "daemon-reload"], check=False)
-        subprocess.run(["systemctl", "--user", "enable", "wps-zotero-proxy"], check=False)
-        subprocess.run(["systemctl", "--user", "restart", "wps-zotero-proxy"], check=False)
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=False, timeout=10)
+        subprocess.run(["systemctl", "--user", "daemon-reexec"], check=False, timeout=10)
+        subprocess.run(["systemctl", "--user", "enable", "wps-zotero-proxy"], check=False, timeout=10)
+        subprocess.run(["systemctl", "--user", "restart", "wps-zotero-proxy"], check=False, timeout=10)
         print("Registered systemd user service wps-zotero-proxy")
     else:
         # Fallback to desktop autostart entry
@@ -114,21 +115,35 @@ X-GNOME-Autostart-enabled=true
 
 def uninstall_service_linux():
     if shutil.which("systemctl"):
-        subprocess.run(
-            ["systemctl", "--user", "disable", "--now", "wps-zotero-proxy"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        try:
+            subprocess.run(
+                ["systemctl", "--user", "disable", "--now", "wps-zotero-proxy"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        except Exception:
+            pass
         if os.path.exists(SYSTEMD_SERVICE_FILE):
             try:
                 os.remove(SYSTEMD_SERVICE_FILE)
             except OSError:
                 pass
-        subprocess.run(
-            ["systemctl", "--user", "daemon-reload"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        try:
+            subprocess.run(
+                ["systemctl", "--user", "daemon-reload"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+            subprocess.run(
+                ["systemctl", "--user", "daemon-reexec"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        except Exception:
+            pass
     if os.path.exists(AUTOSTART_DESKTOP_FILE):
         try:
             os.remove(AUTOSTART_DESKTOP_FILE)
