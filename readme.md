@@ -2,7 +2,7 @@
 
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
 [![Platform: Linux | Windows](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-green.svg)](#installation)
-[![Zotero: 6 | 7](https://img.shields.io/badge/Zotero-6%20%7C%207-red.svg)](https://www.zotero.org/)
+[![Zotero: 6 | 7 | 8+ | 10+](https://img.shields.io/badge/Zotero-v6%20%7C%20v7%20%7C%20v8%2B%20%7C%20v10%2B-red.svg)](https://www.zotero.org/)
 [![WPS Office](https://img.shields.io/badge/WPS%20Office-Writer-orange.svg)](https://www.wps.com/)
 
 A fast, native WPS Writer integration add-on for [Zotero](https://www.zotero.org/) with full keyboard shortcut support, Microsoft Word cross-compatibility, and automatic background proxy management on both **GNU/Linux** and **Windows**.
@@ -52,7 +52,7 @@ Press <kbd>Alt</kbd> (or <kbd>F10</kbd>), then press <kbd>Z</kbd> to activate th
 ## Prerequisites
 
 1. **WPS Office** (WPS Writer with JS Add-in support).
-2. **Zotero** (v6 or v7), installed and running in the background.
+2. **Zotero** (supports v6, v7, and newer versions including Zotero 8, 9, 10+), installed and running in the background.
 3. **Python 3** (3.8 or newer):
    - **Linux**: Pre-installed on almost all distributions (`python3 --version`).
    - **Windows**: Download from [python.org](https://www.python.org/downloads/). **Make sure to check "Add Python to PATH"** during installation.
@@ -164,11 +164,12 @@ To cleanly remove the add-on, stop the proxy service, and clean up registry/conf
   # Should return: {"status": "ok", "version": "0.2.0"}
   ```
 
-### 2. `Alt+Z` does not trigger Zotero
-- Some graphics drivers (e.g. NVIDIA GeForce Experience in-game overlay or AMD Radeon software) intercept `Alt+Z` globally.
-- Use **`Ctrl+Alt+C`** as the built-in alternative shortcut.
-- Alternatively, use the ribbon accelerator: press <kbd>Alt</kbd>, then <kbd>Z</kbd>, then <kbd>C</kbd>.
-
+### 2. Why shortcuts might not trigger in WPS Writer
+- **Restart Required**: If WPS Office was open during `./install.py`, you must completely close and restart WPS Office for the add-in to load.
+- **Linux vs Windows Limitations**:
+  - **On Windows**: The ribbon accelerator sequence (<kbd>Alt</kbd> &rarr; <kbd>Z</kbd> &rarr; <kbd>C</kbd>) is supported via Office CustomUI.
+  - **On Linux**: WPS Office for Linux is built with Qt, which does not implement Microsoft Office-style ribbon KeyTip badges. Furthermore, WPS JS Add-ins run inside a sandboxed Chromium Embedded Framework (CEF) webview process; WPS's internal `Application.KeyBindings` engine only routes shortcuts to document-embedded VBA/JSA macros, not external Chromium add-in webviews. On Linux, use the Zotero ribbon tab buttons directly for citing.
+- **GPU Overlays**: On Windows, if `Alt+Z` is intercepted by NVIDIA GeForce Experience or AMD Radeon Software, use `Ctrl+Alt+C` or the ribbon button.
 ### 3. Zotero citation dialog appears behind WPS Writer
 - This is an upstream window manager / focus behavior in certain desktop environments. Click the Zotero icon in your taskbar / dock to bring the red search bar to front.
 
@@ -199,7 +200,7 @@ WPS-Zotero 是为 WPS 文字（WPS Writer）开发的 Zotero 文献引用集成�
 - **Ribbon 快捷键**：按下 <kbd>Alt</kbd> 后按 <kbd>Z</kbd> 进入 Zotero 选项卡，按 <kbd>C</kbd> 插入引用、<kbd>B</kbd> 插入文献列表、<kbd>R</kbd> 刷新、<kbd>P</kbd> 首选项。
 
 ### 一键安装
-确保已安装 WPS Office、Zotero（保持后台运行）以及 Python 3。
+确保已安装 WPS Office、Zotero（支持 v6、v7 及更新版本如 Zotero 10+，保持后台运行）以及 Python 3。
 
 - **Linux 安装**：
   ```bash
