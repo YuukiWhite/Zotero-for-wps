@@ -39,19 +39,27 @@ function OnAddinLoad(ribbonUI) {
         wps.Env.GetHomePath() + `/.local/share/Kingsoft/wps/jsaddons/wps-zotero_${VERSION}`;
     GLOBAL_MAP.proxyPath = GLOBAL_MAP.instDir + GLOBAL_MAP.osSep + 'proxy.py';
 
-    // Start http proxy server
-    if (GLOBAL_MAP.isWin) {
-        wps.OAAssist.ShellExecute('pythonw.exe', GLOBAL_MAP.proxyPath);
+    // Check if proxy server is already running
+    let isHealthy = false;
+    try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', 'http://127.0.0.1:21931/health', false);
+        try { xhr.timeout = 1000; } catch (_) {}
+        xhr.send(null);
+        if (xhr.status === 200) {
+            isHealthy = true;
+        }
+    } catch (e) {
+        isHealthy = false;
     }
-    else {
-        wps.OAAssist.ShellExecute('python3', GLOBAL_MAP.proxyPath);
+
+    if (!isHealthy) {
+        if (GLOBAL_MAP.isWin) {
+            wps.OAAssist.ShellExecute('pythonw.exe', GLOBAL_MAP.proxyPath);
+        } else {
+            wps.OAAssist.ShellExecute('python3', GLOBAL_MAP.proxyPath);
+        }
     }
-    
-    // Exit the proxy server when the application quits.
-    Application.ApiEvent.AddApiEventListener("ApplicationQuit", () => {
-        postRequestXHR('http://127.0.0.1:21931/stopproxy', null);
-    });
-    
     return true;
 }
 
@@ -95,7 +103,7 @@ function OnAction(control) {
             zc_clearRegistry();
             break;
         case "btnAbout":
-            alert(`WPS-Zotero (${VERSION})\n\nThis add-on is licensed under GPL-3.0: <http://www.gnu.org/licenses/>, it comes with no warranty.\n\nAuthor: Tang, Kewei\nhttps://github.com/tankwyn/WPS-Zotero`);
+            alert(`WPS-Zotero (${VERSION})\n\nThis add-on is licensed under GPL-3.0: <http://www.gnu.org/licenses/>, it comes with no warranty.\n\nAuthor: Tang, Kewei\nUpstream: https://github.com/tankwyn/WPS-Zotero`);
         default:
             break;
     }

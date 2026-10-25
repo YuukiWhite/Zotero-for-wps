@@ -23,8 +23,11 @@ function zc_createClient(documentId, processor) {
                 zc_alert(`Client error ${status}`);
             }
             else {
-                if (status === 503) {
-                    zc_alert('Zotero is serving another program, restart it if this is not the case.');
+                if (status === 502) {
+                    zc_alert('Cannot reach Zotero — please make sure Zotero is open and running.');
+                }
+                else if (status === 503) {
+                    zc_alert('Zotero is serving another program; restart Zotero if this persists.');
                 }
                 else {
                     zc_alert(`Server error ${status}`);
@@ -161,7 +164,7 @@ function zc_createClient(documentId, processor) {
         insertField: function(args) {
             const docId = args[0];
             const fieldType = args[1];
-            const noteType = args[2];
+            let noteType = args[2];
             assert(docId === documentId);
             assert(fieldType === 'Http');
             if (noteType > 1) {
